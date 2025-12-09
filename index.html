@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Alert & Overdose Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes blob {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob {
+            animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+            animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+            animation-delay: 4s;
+        }
+        body {
+            overflow-x: hidden;
+        }
+        @media (max-width: 768px) {
+            .time-display {
+                font-size: 4rem !important;
+            }
+        }
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .time-display {
+                font-size: 8rem !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+```
+<script>
+    let currentView = 'main';
+    let hasPlayedAlarm = false;
+    
+    function updateTime() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const timeString = `${hours}:${minutes}:${seconds}`;
+        
+        const dateString = now.toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric'
+        });
+        
+        const min = now.getMinutes();
+        const sec = now.getSeconds();
+        
+        let timeColor = 'normal';
+        if ((min === 19 && sec >= 40) || (min === 59 && sec >= 40)) {
+            timeColor = 'red';
+        } else if ((min === 18) || (min === 19 && sec < 40) || 
+                   (min === 58) || (min === 59 && sec < 40)) {
+            timeColor = 'amber';
+        }
+        
+        // Handle alarm
+        if ((min === 19 && sec === 40) || (min === 59 && sec === 40)) {
+            if (!hasPlayedAlarm) {
+                playAlarm();
+                hasPlayedAlarm = true;
+            }
+        } else if ((min === 19 && sec === 43) || (min === 59 && sec === 43)) {
+            hasPlayedAlarm = false;
+        }
+        
+        if (currentView === 'main') {
+            renderMainView(timeString, dateString, timeColor);
+        }
+    }
+    
+    function playAlarm() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            
+            oscillator.start();
+            setTimeout(() => {
+                oscillator.stop();
+                audioContext.close();
+            }, 3000);
+        } catch (e) {
+            console.error('Audio error:', e);
+        }
+    }
+    
+    function getBackgroundGradient(timeColor) {
+        if (timeColor === 'red') {
+            return 'from-red-950 via-red-900 to-red-950';
+        }
+        if (timeColor === 'amber') {
+            return 'from-amber-950 via-amber-900 to-amber-950';
+        }
+        return 'from-slate-950 via-blue-950 to-slate-950';
+    }
+    
+    function getTimeTextColor(timeColor) {
+        if (timeColor === 'red') return 'text-red-300';
+        if (timeColor === 'amber') return 'text-amber-300';
+        return 'text-blue-300';
+    }
+    
+    function renderMainView(timeString, dateString, timeColor) {
+        const bgGradient = getBackgroundGradient(timeColor);
+        const textColor = getTimeTextColor(timeColor);
+        
+        document.getElementById('app').innerHTML = `
+            <div class="min-h-screen bg-gradient-to-br ${bgGradient} relative overflow-hidden transition-all duration-1000">
+                <!-- Animated flowing background effect -->
+                <div class="absolute inset-0 opacity-30">
+                    <div class="absolute top-0 left-1/4 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+                    <div class="absolute top-0 right-1/4 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
+                    <div class="absolute bottom-0 left-1/3 w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
+                </div>
+
+                <div class="max-w-5xl mx-auto px-8 py-16 relative z-10">
+                    <!-- Time Display -->
+                    <div class="mb-16 text-center">
+                        <div class="time-display text-[16rem] font-extralight tracking-wider ${textColor} transition-colors duration-1000 leading-none mb-4">
+                            ${timeString}
+                        </div>
+                        <div class="text-2xl font-light text-gray-400 tracking-widest">
+                            ${dateString}
+                        </div>
+                    </div>
+
+                    <!-- Buttons Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                        <button
+                            onclick="showOverdoseCalc()"
+                            class="group relative bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 text-white p-8 rounded-2xl hover:from-white/15 hover:to-white/10 transition-all duration-300 font-light text-xl tracking-wide overflow-hidden hover:translate-y-[-4px] active:translate-y-[2px]"
+                            style="transform: translateZ(0); box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 8px 32px rgba(0,0,0,0.4);"
+                        >
+                            <div class="absolute inset-0 bg-gradient-to-br from-red-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                            <span class="relative z-10">Overdose</span>
+                        </button>
+                        
+                        ${Array(7).fill(0).map((_, i) => `
+                            <button
+                                class="bg-gradient-to-br from-white/5 to-white/2 backdrop-blur-md border border-white/10 text-gray-500 p-8 rounded-2xl font-light text-xl tracking-wide cursor-not-allowed"
+                                style="transform: translateZ(0); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 32px rgba(0,0,0,0.3);"
+                                disabled
+                            >
+                                Button ${i + 2}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    function showOverdoseCalc() {
+        currentView = 'overdose';
+        renderOverdoseView();
+    }
+    
+    function showMainView() {
+        currentView = 'main';
+        updateTime();
+    }
+    
+    function calculateDose() {
+        const strength = parseFloat(document.getElementById('tabletStrength').value);
+        const taken = parseFloat(document.getElementById('tabletsTaken').value);
+        const weight = parseFloat(document.getElementById('patientWeight').value);
+        
+        if (strength && taken && weight && weight > 0) {
+            const totalDose = strength * taken;
+            const dosePerKg = (totalDose / weight).toFixed(2);
+            
+            document.getElementById('result').innerHTML = `
+                <div class="mt-8 p-6 bg-red-500/10 backdrop-blur-md rounded-2xl border border-red-500/30">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <h3 class="text-lg font-light text-red-300 tracking-wide">Result</h3>
+                    </div>
+                    <p class="text-5xl font-extralight text-red-300 tracking-wider">
+                        ${dosePerKg} <span class="text-2xl">mg/kg</span>
+                    </p>
+                    <p class="text-sm text-red-300/70 mt-1 tracking-wide">Patient dose per Kg</p>
+                </div>
+            `;
+        } else {
+            document.getElementById('result').innerHTML = '';
+        }
+    }
+    
+    function renderOverdoseView() {
+        document.getElementById('app').innerHTML = `
+            <div class="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 p-8 relative overflow-hidden">
+                <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent"></div>
+                
+                <div class="max-w-2xl mx-auto relative z-10">
+                    <button
+                        onclick="showMainView()"
+                        class="mb-6 px-6 py-3 bg-white/10 backdrop-blur-md text-white rounded-xl hover:bg-white/20 transition-all border border-white/20"
+                    >
+                        ← Back
+                    </button>
+                    
+                    <div class="bg-white/5 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/10">
+                        <div class="flex items-center gap-3 mb-8">
+                            <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                                <line x1="8" y1="12" x2="16" y2="12"></line>
+                                <line x1="12" y1="16" x2="12" y2="8"></line>
+                            </svg>
+                            <h2 class="text-3xl font-light text-white tracking-wide">Overdose Calculator</h2>
+                        </div>
+
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-light text-gray-300 mb-2 tracking-wide">
+                                    Tablet Strength (mg)
+                                </label>
+                                <input
+                                    type="number"
+                                    id="tabletStrength"
+                                    oninput="calculateDose()"
+                                    class="w-full px-4 py-3 bg-white/5 backdrop-blur-md border border-white/20 rounded-xl focus:border-blue-400 focus:outline-none text-lg text-white placeholder-gray-500"
+                                    placeholder="Enter tablet strength"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-light text-gray-300 mb-2 tracking-wide">
+                                    Tablets Taken
+                                </label>
+                                <input
+                                    type="number"
+                                    id="tabletsTaken"
+                                    oninput="calculateDose()"
+                                    class="w-full px-4 py-3 bg-white/5 backdrop-blur-md border border-white/20 rounded-xl focus:border-blue-400 focus:outline-none text-lg text-white placeholder-gray-500"
+                                    placeholder="Enter number of tablets"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-light text-gray-300 mb-2 tracking-wide">
+                                    Patient Weight (kg)
+                                </label>
+                                <input
+                                    type="number"
+                                    id="patientWeight"
+                                    oninput="calculateDose()"
+                                    class="w-full px-4 py-3 bg-white/5 backdrop-blur-md border border-white/20 rounded-xl focus:border-blue-400 focus:outline-none text-lg text-white placeholder-gray-500"
+                                    placeholder="Enter patient weight"
+                                />
+                            </div>
+
+                            <div id="result"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Initialize
+    updateTime();
+    setInterval(updateTime, 100);
+</script>
+```
+
+</body>
+</html>
